@@ -9,33 +9,7 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 
-class FileReporter(
-) : BaseErrorListener() {
-    val errors = mutableListOf<String>()
-
-    override fun syntaxError(
-        recognizer: Recognizer<*, *>?,
-        offendingSymbol: Any?,
-        line: Int,
-        charPositionInLine: Int,
-        msg: String?,
-        e: RecognitionException?
-    ) {
-        if (msg != null) {
-            errors.add("$line:$charPositionInLine $msg")
-        }
-    }
-
-    fun writeReport(baseDir: Path, appName: String) {
-        val reportPath = baseDir.resolve("${appName}_errors_report.txt")
-        Files.write(reportPath, errors)
-    }
-
-    val hasErrors: Boolean
-        get() = errors.isNotEmpty()
-}
-
-fun obfuscateApplication(path: Path, newSmaliDirName: String): Boolean {
+fun obfuscateApplication(path: Path, newSmaliDirName: String) {
     val smaliDir = path.resolve("smali")
     val smaliFiles = buildList {
         Files.walkFileTree(smaliDir, object : SimpleFileVisitor<Path>() {
@@ -50,18 +24,12 @@ fun obfuscateApplication(path: Path, newSmaliDirName: String): Boolean {
     val globalObfuscations: MutableList<Obfuscation> = mutableListOf()
     val programs: MutableList<Program> = mutableListOf()
     for (file in smaliFiles) {
-        val errorListener = FileReporter()
         val lexer = SmaliLexer(CharStreams.fromFileName(file.toString()))
         lexer.removeErrorListeners()
         val tokens = CommonTokenStream(lexer)
         val parser = SmaliParser(tokens)
         parser.removeErrorListeners()
-        parser.addErrorListener(errorListener)
         val tree = parser.parse()
-        if (errorListener.hasErrors) {
-            errorListener.writeReport(file.parent, file.fileName.toString())
-            return false
-        }
         val obfuscationsProducer = SmaliObfuscationsProducer()
         obfuscationsProducer.visit(tree)
         globalObfuscations.addAll(obfuscationsProducer.globalObfuscations())
@@ -79,5 +47,4 @@ fun obfuscateApplication(path: Path, newSmaliDirName: String): Boolean {
         Files.createDirectories(Path.of(newFile).parent)
         Files.write(Path.of(newFile), obfuscated.toByteArray())
     }
-    return true
 }

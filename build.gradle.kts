@@ -29,6 +29,10 @@ tasks.named("compileKotlin") {
     dependsOn(tasks.named("generateGrammarSource"))
 }
 
+tasks.named("compileTestKotlin") {
+    dependsOn(tasks.named("generateGrammarSource"))
+}
+
 tasks.generateGrammarSource {
     arguments = arguments + listOf("-visitor")
 }
