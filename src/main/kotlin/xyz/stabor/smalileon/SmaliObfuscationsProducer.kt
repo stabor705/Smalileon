@@ -35,7 +35,15 @@ class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
     }
 
     override fun visitMethodDirective(ctx: SmaliParser.MethodDirectiveContext?) {
-        val methodSignatureNode = ctx?.methodDeclaration()?.methodSignature()
+        if (ctx == null) {
+            return
+        }
+        obfuscateMethodName(ctx)
+        addDummyInstructions(ctx)
+    }
+
+    private fun obfuscateMethodName(ctx: SmaliParser.MethodDirectiveContext) {
+        val methodSignatureNode = ctx.methodDeclaration()?.methodSignature()
         val methodSignatureText = methodSignatureNode?.text
         val methodIdentifierNode = methodSignatureNode?.methodIdentifier()
         val isBuiltIn = (methodIdentifierNode?.getChild(0)?.text ?: "") == "<"
@@ -47,6 +55,10 @@ class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
         val from = methodSignatureText ?: return
         val to = methodSignatureText.replace("${methodName}(", "${newMethodName}(")
         globalObfuscations.add(IdentifierRenameObfuscation(from, to))
+    }
+
+    private fun addDummyInstructions(ctx: SmaliParser.MethodDirectiveContext) {
+        localObfuscations.add(InstructionAppendingObfuscation(ctx.getStart().line))
     }
 
     fun globalObfuscations() = globalObfuscations.toList()

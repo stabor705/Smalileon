@@ -9,27 +9,27 @@ import kotlinx.coroutines.runBlocking
 import me.tongfei.progressbar.ProgressBar
 import xyz.stabor.smalileon.reassembleApplication
 
-suspend fun main(args: Array<String>) = coroutineScope {
-    val dir = Paths.get("").toAbsolutePath().toString().let { Paths.get(it, "/src/main/resources/data/benign") } ?:
-        throw Error("No dir specified")
-    val allApps = Files.walk(dir, 1)
-        .filter { it.isDirectory() }
-        .filter { it != dir}
-        .toList()
-    val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
-    allApps.map { app ->
-        try {
-            reassembleApplication(app, "smali-reassembled")
-        } catch (e: Exception) {
-            println("Error processing $app: $e")
-        }
-        progressBar.step()
-    }
+//suspend fun main(args: Array<String>) = coroutineScope {
+//    val dir = Paths.get("").toAbsolutePath().toString().let { Paths.get(it, "/src/main/resources/data/benign") } ?:
+//        throw Error("No dir specified")
+//    val allApps = Files.walk(dir, 1)
+//        .filter { it.isDirectory() }
+//        .filter { it != dir}
+//        .toList()
+//    val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
+//    allApps.map { app ->
+//        try {
+//            reassembleApplication(app, "smali-reassembled")
+//        } catch (e: Exception) {
+//            println("Error processing $app: $e")
+//        }
+//        progressBar.step()
+//    }
+//
+//    progressBar.close()
+//}
 
-    progressBar.close()
-}
-
-fun parserProgram() = runBlocking {
+suspend fun main(args: Array<String>) = coroutineScope{
 //    val dir = args.getOrNull(0)?.let { Paths.get(it) } ?: throw Error("No dir specified")
     val dir = Paths.get("").toAbsolutePath().toString().let { Paths.get(it, "/src/main/resources/data/benign") } ?:
     throw Error("No dir specified")
