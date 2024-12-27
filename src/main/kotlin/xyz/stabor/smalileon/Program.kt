@@ -5,8 +5,8 @@ import java.nio.file.Path
 data class Program(
     val filepath: Path,
     val lines: List<String>,
-    val linesToReplace: Map<Int, String> = mapOf(),
-    val linesToAppend: Map<Int, List<String>> = mapOf()
+    private val linesToReplace: Map<Int, String> = mapOf(),
+    private val linesToAppend: Map<Int, List<String>> = mapOf()
 ) {
     fun replaceLine(lineNumber: Int, newLine: String) =
         copy(linesToReplace = linesToReplace.plus(Pair(lineNumber, newLine)))
