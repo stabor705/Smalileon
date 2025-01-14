@@ -1,55 +1,100 @@
-import SmaliParser.ExtendedParamDirectiveContext
+import com.github.ajalt.clikt.command.SuspendingCliktCommand
+import com.github.ajalt.clikt.command.main
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.enum
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import me.tongfei.progressbar.ProgressBar
+import xyz.stabor.smalileon.SmaliObfuscationsProducerConfiguration
 import xyz.stabor.smalileon.obfuscateApplication
+import xyz.stabor.smalileon.reassembleApplication
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.isDirectory
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import me.tongfei.progressbar.ProgressBar
-import xyz.stabor.smalileon.reassembleApplication
 
-//suspend fun main(args: Array<String>) = coroutineScope {
-//    val dir = Paths.get("").toAbsolutePath().toString().let { Paths.get(it, "/src/main/resources/data/benign") } ?:
-//        throw Error("No dir specified")
-//    val allApps = Files.walk(dir, 1)
-//        .filter { it.isDirectory() }
-//        .filter { it != dir}
-//        .toList()
-//    val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
-//    allApps.map { app ->
-//        try {
-//            reassembleApplication(app, "smali-reassembled")
-//        } catch (e: Exception) {
-//            println("Error processing $app: $e")
-//        }
-//        progressBar.step()
-//    }
-//
-//    progressBar.close()
-//}
+enum class ObfuscationType {
+    REPACKAGE,
+    RENAME_CLASSES,
+    RENAME_METHODS,
+    RENAME_FIELDS,
+    ADD_INSTRUCTIONS,
+    ALL
+}
 
-suspend fun main(args: Array<String>) = coroutineScope{
-//    val dir = args.getOrNull(0)?.let { Paths.get(it) } ?: throw Error("No dir specified")
-    val dir = Paths.get("").toAbsolutePath().toString().let { Paths.get(it, "/src/main/resources/data/benign") } ?:
-    throw Error("No dir specified")
-    val allApps = Files.walk(dir, 1)
-        .filter { it.isDirectory() }
-        .filter { it != dir}
-        .toList()
-    val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
-    val jobs = allApps.map { app ->
-        launch {
+class App : SuspendingCliktCommand() {
+    val obfuscationType: ObfuscationType? by option("--obfuscations").enum<ObfuscationType> { it.name.lowercase() }
+    val dir: String? by argument("<dir>")
+    val outDirName: String? by option("--out_dir_name")
+    val inDirName: String? by option("--in_dir_name")
+
+    companion object {
+        fun makeConfiguration(obfuscationType: ObfuscationType) = when(obfuscationType) {
+            ObfuscationType.RENAME_CLASSES -> SmaliObfuscationsProducerConfiguration(obfuscateClassNames = true)
+            ObfuscationType.RENAME_METHODS -> SmaliObfuscationsProducerConfiguration(obfuscateMethodNames = true)
+            ObfuscationType.RENAME_FIELDS -> SmaliObfuscationsProducerConfiguration(obfuscateMethodNames = true)
+            ObfuscationType.ADD_INSTRUCTIONS -> SmaliObfuscationsProducerConfiguration(addDummyInstructions = true)
+            ObfuscationType.ALL -> SmaliObfuscationsProducerConfiguration(
+                obfuscateClassNames = true,
+                obfuscateMethodNames = true,
+                obfuscateFieldNames = true,
+                addDummyInstructions = true
+            )
+            else -> SmaliObfuscationsProducerConfiguration()
+        }
+    }
+
+    override suspend fun run() {
+        val dirPath = Paths.get(dir) ?: throw Error("Bad dir path")
+        val allApps = withContext(Dispatchers.IO) {
+            Files.walk(dirPath, 1)
+        }
+            .filter { it.isDirectory() }
+            .filter { it != dirPath}
+            .toList()
+        if (obfuscationType == ObfuscationType.REPACKAGE) {
+            executeRepackageObfuscations(allApps)
+        } else {
+            executeParserObfuscations(allApps)
+        }
+    }
+
+    suspend fun executeParserObfuscations(allApps: List<Path>) = coroutineScope {
+        val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
+        val configuration = makeConfiguration(obfuscationType ?: ObfuscationType.ALL)
+        val jobs = allApps.map { app ->
+            launch {
+                try {
+                    obfuscateApplication(app, outDirName ?: "smali-obfuscated", configuration)
+                } catch (e: Exception) {
+                    println("Error processing $app: $e")
+                }
+                progressBar.step()
+            }
+        }
+
+        jobs.forEach { it.join() }
+
+        progressBar.close()
+    }
+
+    fun executeRepackageObfuscations(allApps: List<Path>) {
+        val progressBar = ProgressBar("Obfuscating...", allApps.count().toLong())
+        for (app in allApps) {
             try {
-                obfuscateApplication(app, "smali-classes")
+                reassembleApplication(app, outDirName ?: "smali-obfuscated")
             } catch (e: Exception) {
                 println("Error processing $app: $e")
             }
             progressBar.step()
         }
+
+        progressBar.close()
     }
-
-    jobs.forEach { it.join() }
-
-    progressBar.close()
 }
+
+
+suspend fun main(args: Array<String>) = App().main(args)

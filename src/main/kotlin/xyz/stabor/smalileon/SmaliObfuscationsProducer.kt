@@ -3,7 +3,16 @@ package xyz.stabor.smalileon
 import SmaliParser
 import SmaliParserBaseVisitor
 
-class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
+data class SmaliObfuscationsProducerConfiguration(
+    val obfuscateClassNames: Boolean = false,
+    val obfuscateFieldNames: Boolean = false,
+    val obfuscateMethodNames: Boolean = false,
+    val addDummyInstructions: Boolean = false
+)
+
+class SmaliObfuscationsProducer(
+    private val configuration: SmaliObfuscationsProducerConfiguration
+) : SmaliParserBaseVisitor<Unit>() {
     private val globalObfuscations: MutableList<Obfuscation> = mutableListOf()
     private val localObfuscations: MutableList<Obfuscation> = mutableListOf()
 
@@ -12,7 +21,13 @@ class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
     }
 
     override fun visitClassDirective(ctx: SmaliParser.ClassDirectiveContext?) {
-        val classNameNode = ctx?.className()?.referenceType()?.QUALIFIED_TYPE_NAME() ?: return
+        if (configuration.obfuscateClassNames && ctx != null) {
+            obfuscateClassNames(ctx)
+        }
+    }
+
+    fun obfuscateClassNames(ctx: SmaliParser.ClassDirectiveContext) {
+        val classNameNode = ctx.className()?.referenceType()?.QUALIFIED_TYPE_NAME() ?: return
         val newClassName = generateRandomIdentifier()
         val className = classNameNode.text
         val to = className
@@ -23,6 +38,12 @@ class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
     }
 
     override fun visitFieldDirective(ctx: SmaliParser.FieldDirectiveContext?) {
+        if (ctx != null && configuration.obfuscateFieldNames) {
+            obfuscateFieldNames(ctx)
+        }
+    }
+
+    fun obfuscateFieldNames(ctx: SmaliParser.FieldDirectiveContext) {
         val fieldNode = ctx?.fieldNameAndType() ?: return
         val identifierNode = fieldNode.fieldName()?.identifier() ?: return
         for (i in 0 until identifierNode.childCount) {
@@ -38,8 +59,12 @@ class SmaliObfuscationsProducer : SmaliParserBaseVisitor<Unit>() {
         if (ctx == null) {
             return
         }
-        obfuscateMethodName(ctx)
-        addDummyInstructions(ctx)
+        if (configuration.obfuscateMethodNames) {
+            obfuscateMethodName(ctx)
+        }
+        if (configuration.addDummyInstructions) {
+            addDummyInstructions(ctx)
+        }
     }
 
     private fun obfuscateMethodName(ctx: SmaliParser.MethodDirectiveContext) {

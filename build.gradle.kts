@@ -15,6 +15,7 @@ dependencies {
     antlr("org.antlr:antlr4:4.13.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("me.tongfei:progressbar:0.10.1")
+    implementation("com.github.ajalt.clikt:clikt:5.0.2")
 }
 
 tasks.test {
@@ -41,4 +42,10 @@ tasks.withType<Jar> {
     manifest {
         attributes["Main-Class"] = "MainKt"
     }
+
+    from ({
+        configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }
+    })
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
